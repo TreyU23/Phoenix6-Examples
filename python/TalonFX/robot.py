@@ -1,50 +1,67 @@
-#!/usr/bin/env python3
-"""
-    This is a demo program for TalonFX usage in Phoenix 6
-"""
 import wpilib
-from wpilib import Timer, XboxController
+from wpilib import *
 from phoenix6 import CANBus, controls, hardware
 
 class MyRobot(wpilib.TimedRobot):
-    """
-    Example program that shows how to use TalonFX
-    in Phoenix 6 python
-    """
+
+    double MOTOR_ID = 1.0
+    double SHOULDER_ID = 2.0
+    double SHOOTING_POSE = 45.0
+    double INTAKE_POSE = 120.0
+    double HOLDING__POSE = 90.0
+    double SHOOTING_VOLTS = 12.2
+    double INTAKE_VOLTS = -9.0
+    double HOLDING_VOLTS = 0.5
 
     def robotInit(self):
-        """Robot initialization function"""
+        self.controller = XboxController(0)
 
-        # Keep a reference to all the motor controllers used
-        self.talonfx = hardware.TalonFX(1, CANBus("canivore"))
-        self.control = controls.DutyCycleOut(0)
+        self.shooter = hardware.talonfx(MOTOR_ID)
+        self.shoulder = hardware.talonfx(SHOULDER_ID)
 
-        self.timer = Timer()
-        self.timer.start()
+        cfg = configs.TalonFXConfiguration()
+        
+        cfg.slot0.k_s = 0.1
+        cfg.slot0.k_v = 0.12
+        cfg.slot0.k_p = 5.0
+        cfg.slot0.k_i = 0
+        cfg.slot0.k_d = 0
+        cfg.voltage.peak_forward_voltage = 8
+        cfg.voltage.peak_reverse_voltage = -8
+        self.shooter.configurator.apply(cfg)
 
-        self.joystick = XboxController(0)
+        cfgShoulder = configs.TalonFXConfiguration()
+
+        mm = cfgShoulder.motion_magic
+        mm.motion_magic_cruise_velocity = 5
+        mm.motion_magic_acceleration = 10
+        mm.motion_magic_jerk = 100
+
+        slot0 = cfgShoulder.slot0
+        slot0.k_s = 0.25
+        slot0.k_v = 0.12
+        slot0.k_a = 0.01
+        slot0.k_p = 60
+        slot0.k_i = 0
+        slot0.k_d = 0.5
+        self.shoulder.configurator.apply(cfgShoulder)
 
     def teleopPeriodic(self):
-        """Every 100ms, print the status of the StatusSignal"""
+        if self.controller.getLeftTrigger() {
+            self.shooter.set_control(controls.voltage(SHOOTING_VOLTS))
+        } elif self.controller.getRightTrigger() {
+            self.shooter.set_control(controls.voltage(INTAKE_VOLTS))
+        } else {
+            self.shooter.set_control(controls.voltage(HOLDING_VOLTS))
+        }
 
-        self.talonfx.set_control(self.control.with_output(self.joystick.getLeftY()))
-
-        if self.timer.hasElapsed(0.1):
-            self.timer.reset()
-            # get_position automatically calls refresh(), no need to manually refresh.
-            #
-            # StatusSignals also implement the str dunder to provide a useful print of the signal
-            pos = self.talonfx.get_position()
-            print(f"Positions is {str(pos)} with {pos.timestamp.get_latency()} seconds of latency")
-
-            # Get the velocity StatusSignal without refreshing
-            vel = self.talonfx.get_velocity(False)
-            # This time wait for the signal to reduce latency
-            vel.wait_for_update(0.1)
-            print(f"Velocity is {vel} with {vel.timestamp.get_latency()} seconds of latency")
-
-            print("")
-
+        if self.controller.getLeftBumper() {
+            self.shoulder.set_control(controls.MotionMagicVoltage(SHOOTING_POSE))
+        } elif self.controller.getRightBumper() {
+            self.shoulder.set_control(controls.MotionMagicVoltage(INTAKE_POSE))
+        } else {
+            self.shoulder.set_control(controls.MotionMagicVoltage(HOLDING__POSE))
+        }
 
 if __name__ == "__main__":
     wpilib.run(MyRobot)
